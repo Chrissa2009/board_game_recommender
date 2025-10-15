@@ -7,7 +7,6 @@ venv/
 anaconda_projects/db/*.db
 
 # Data
-data/
 bgg.db
 *.csv
 
