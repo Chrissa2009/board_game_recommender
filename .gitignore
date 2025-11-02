@@ -6,10 +6,8 @@ __pycache__/
 venv/
 anaconda_projects/db/*.db
 
-# Data
-bgg.db
-*.csv
-!data/*.csv
+# Streamlit
+.streamlit/
 
 # Jupyter
 .ipynb_checkpoints/
