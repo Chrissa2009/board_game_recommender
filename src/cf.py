@@ -7,18 +7,31 @@ This module computes similarity based on user ratings.
 import pandas as pd
 import numpy as np
 
+def fold_in_implicit_user(V, liked_items, alpha=5, lambda_=0.03):
+    """
+    Compute a new user vector given items they've liked (implicit feedback).
+    """
+    V_i = V[liked_items]
+    # confidence weights
+    C_i = 1 + alpha * np.ones(len(liked_items), dtype=np.float32)
+    
+    A = V_i.T @ (C_i[:, None] * V_i) + lambda_ * np.eye(V.shape[1])
+    b = V_i.T @ (C_i * np.ones(len(liked_items), dtype=np.float32))
+    
+    u_new = np.linalg.solve(A, b)
+    return u_new
+
+
 def get_cf_scores(
-    user_id: int,
-    ratings_path: str = "../data/user_ratings.csv",
-    games_path: str = "../data/games.csv",
-    top_n: int = 10
+    ratings: np.ndarray = np.array([]),
+    #games_path: str = "../data/games.csv",
 ):
     """
-    Compute CF-based recommendation scores for a user based on other similar users' ratings.
+    Compute CF-based recommendation scores based on pre-computed item embedding matrix V and a vector of movie IDs of user likes
 
     Parameters
     ----------
-    user_id : int
+    ratings : int
         ID of the target user.
     ratings_path : str
         Path to the user-game ratings CSV file.
@@ -32,24 +45,19 @@ def get_cf_scores(
     pd.DataFrame
         DataFrame with columns [Name, CF_Score].
     """
-    ratings_df = pd.read_csv(ratings_path)
-    games_df = pd.read_csv(games_path)[["BGGId", "Name"]].drop_duplicates()
 
-    # Placeholder logic (to be replaced)
-    cf_scores_df = (
-        ratings_df.groupby("BGGId")["Rating"].mean().reset_index()
-    )
-    cf_scores_df.rename(columns={"Rating": "CF_Score"}, inplace=True)
-    max_score = cf_scores_df["CF_Score"].max()
-    if max_score:
-        cf_scores_df["CF_Score"] = cf_scores_df["CF_Score"] / max_score
+    #load board game embeddings
+    V = np.load('V_final.npy')
+    
+    # calculte user embeddings based on inputted likes 
+    u = fold_in_implicit_user(V,liked_items=ratings, alpha=5, lambda_=0.3)
 
-    cf_scores_df = cf_scores_df.merge(games_df, on="BGGId", how="left")
-    cf_scores_df = cf_scores_df[["BGGId", "Name", "CF_Score"]]
+    #calculate scores
+    scores = V.dot(u)
 
-    return cf_scores_df.sort_values("CF_Score", ascending=False).head(top_n)
+    #normalize between 0 and 1 
+    scores = (scores - min(scores)) / (max(scores) - min(scores))
 
+    # returns array of scores per movie
+    return scores 
 
-if __name__ == "__main__":
-    df = get_cf_scores(user_id=123)
-    print(df)
