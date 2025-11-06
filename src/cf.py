@@ -11,7 +11,9 @@ def fold_in_implicit_user(V, liked_items, alpha=5, lambda_=0.03):
     """
     Compute a new user vector given items they've liked (implicit feedback).
     """
+    liked_items = np.array(liked_items, dtype=int).flatten()
     V_i = V[liked_items]
+    print(liked_items)
     # confidence weights
     C_i = 1 + alpha * np.ones(len(liked_items), dtype=np.float32)
     
@@ -19,8 +21,10 @@ def fold_in_implicit_user(V, liked_items, alpha=5, lambda_=0.03):
     b = V_i.T @ (C_i * np.ones(len(liked_items), dtype=np.float32))
     
     u_new = np.linalg.solve(A, b)
+    print("DEBUG V shape:", V.shape)
+    print("DEBUG liked_items dtype:", liked_items.dtype)
+    print("DEBUG liked_items:", liked_items)
     return u_new
-
 
 def get_cf_scores(
     ratings: np.ndarray = np.array([]),
@@ -58,5 +62,12 @@ def get_cf_scores(
     scores = (scores - min(scores)) / (max(scores) - min(scores))
 
     # returns array of scores per movie
-    return scores 
+    return scores
 
+if __name__ == "__main__":
+    # Example usage
+    example_ratings = np.array([10, 50, 200])
+    scores = get_cf_scores(ratings=example_ratings)
+    print("CF Scores:", scores)
+    print("CF Scores Length:", len(scores))
+    

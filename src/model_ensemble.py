@@ -1,13 +1,14 @@
 import pandas as pd
 import numpy as np
 import warnings
+import sys, os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from cbf import get_CBF_scores
+from cbf import get_cbf_scores
 from cf import get_cf_scores
 from llm import get_llm_scores, category_columns
 
 warnings.filterwarnings('ignore')
-
 
 ### Load games into games_df
 games_file = "../data/games_master_data.csv"
@@ -18,7 +19,6 @@ def semicolon_to_list(value):
     if isinstance(value, list):  # prevent double conversion
         return value
     return [item.strip() for item in str(value).split(';') if item.strip()]
-
 
 games_df = pd.read_csv(
     games_file,
@@ -65,9 +65,7 @@ games_df.rename(columns={'simple_game_categories': 'game_categories', 'simple_ga
 games_df = games_df.set_index("bgg_id", drop=False)
 n_games = games_df.shape[0]
 
-
-
-### get enseble score
+### get ensemble score
 def ensemble_scores(liked_games=None,
                     disliked_games=None,
                     exclude_games=None,
@@ -108,16 +106,31 @@ def ensemble_scores(liked_games=None,
     pd.DataFrame
         Combined recommendations with composite score.
     """
-
-    ## Kai - how to call this?
-    #cf_scores = get_CF_scores(liked_games, disliked_games)
-    cf_scores = np.zeros(len(games_df))
+    # get cf_scores
+    # cf_scores = get_cf_scores(liked_games, disliked_games)
+    cf_scores = np.zeros(n_games)
     
-    cbf_scores = get_CBF_scores(attributes = attributes)
+    # get cbf_scores
+    cbf_scores = get_cbf_scores(attributes=attributes)
 
-    ## Chrissa - how to call this?
-    #llm_scores = get_LLM_scores(???)
-    llm_scores = np.zeros(len(games_df))
+    # get llm_scores
+    min_players = 1
+    if attributes and 'players' in attributes:
+        players = attributes['players']
+        if isinstance(players, (list, tuple)) and len(players) > 0:
+            min_players = players[0]
+
+    category = category_columns[0]
+    if attributes and 'game_categories' in attributes:
+        cats = attributes['game_categories']
+        if isinstance(cats, (list, tuple)) and len(cats) > 0 and cats[0]:
+            category = cats[0]
+
+    llm_scores = get_llm_scores(
+        user_description=description or "",
+        min_players=min_players,
+        category=category,
+    )
     
     # convert and validate input
     cf_scores = np.array(cf_scores)
@@ -232,15 +245,7 @@ def ensemble_scores(liked_games=None,
 
     return recommendations
 
-
-
-
-
-
-
-
-###
-### show recommendationsget_hybrid_recommendations
+### Show recommendationsget_hybrid_recommendations
 ###
 def display_recommendations(liked_games,
                             disliked_games,
@@ -302,10 +307,7 @@ def display_recommendations(liked_games,
         print(f"    Year: {int(game.get('year_published', 0))} "
               f"| Players: {int(game.get('players_min', 0))}–{int(game.get('players_max', 0))}\n")
 
-
-
-###
-### run Recommender
+### Run Recommender
 ###
 
 # Example 1
@@ -323,10 +325,6 @@ attributes = {'game_types': ['Abstract Game', 'Family Game'],
 
 display_recommendations(liked_games, disliked_games, exclude_games, attributes, description, n_recommendations=5, alpha=0.5, beta=0.33)
 
-
-
-
-
 # Example 2
 liked_games = [167791]
 disliked_games = []
@@ -342,9 +340,6 @@ attributes = {'game_types': ['Strategy Game'],
               'year_published':[1999,2025]}
 
 display_recommendations(liked_games, disliked_games, exclude_games, attributes, description, n_recommendations=5, alpha=0.5, beta=0.33)
-
-
-
 
 # Example 3
 liked_games = [31260, 13]
@@ -377,6 +372,3 @@ attributes = {'game_types': ['Strategy Game','Family Game'],
               'year_published':[2000,2025]}
 
 display_recommendations(liked_games, disliked_games, exclude_games, attributes, description, n_recommendations=5, alpha=0.5, beta=0.33)
-
-
-

@@ -10,47 +10,56 @@ load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Load game data
-games_df = pd.read_csv("../data/games.csv")
+games_df = pd.read_csv("../data/games_master_data.csv", encoding="utf-8-sig")
+
 desc_df = pd.read_csv("../data/game_descriptions.csv", encoding="utf-8-sig").rename(
-    columns={"bgg_id": "BGGId", "full_description": "Description"}
+    columns={"bgg_id": "bgg_id", "full_description": "Description"}
 )
 
-# Merge datasets on BGGId
+# Merge datasets on bgg_id
 merged_df = pd.merge(
     games_df.drop(columns=["Description"], errors="ignore"),
-    desc_df[["BGGId", "Description"]],
-    on="BGGId",
+    desc_df[["bgg_id", "Description"]],
+    on="bgg_id",
     how="inner"
 )
 
 # Extract all category columns automatically
-category_columns = [col for col in games_df.columns if col.startswith("Cat:")]
+games_df["simple_game_categories"] = games_df["simple_game_categories"].fillna("").astype(str)
+all_categories = (
+    games_df["simple_game_categories"]
+    .str.split(";")
+    .explode()
+    .str.strip()
+    .dropna()
+    .unique()
+)
+category_columns = sorted(all_categories.tolist())
 
 def get_llm_scores(user_description: str, min_players: int, category: str):
     """
     Generate LLM-based relevance scores for candidate games based on the user description.
-    Returns a DataFrame: [BGGId, Name, LLM_Score].
+    Returns a 1D NumPy array of scores aligned with games_df order.
     """
-    category_col = f"Cat:{category}"
-    if category_col not in merged_df.columns:
+    if category not in category_columns:
         raise ValueError(f"Invalid category '{category}'. Available categories: {category_columns}")
 
-    # Filter dataset by player count and category
+    # Filter dataset by player count and simple category
     filtered_df = merged_df[
-        (merged_df["MinPlayers"] <= min_players)
-        & (merged_df["MaxPlayers"] >= min_players)
-        & (merged_df[category_col] == 1)
+        (merged_df["players_min"] <= min_players)
+        & (merged_df["players_max"] >= min_players)
+        & (merged_df["simple_game_categories"].str.contains(fr"\b{category}\b", case=False, na=False))
     ]
 
     if filtered_df.empty:
-        return pd.DataFrame(columns=["Name", "LLM_Score"])
+        return np.zeros(len(games_df))
 
     # Limit to top 20 by rating for token efficiency
-    candidate_games = filtered_df.sort_values("AvgRating", ascending=False).head(20)
+    candidate_games = filtered_df.sort_values("avg_rating", ascending=False).head(20)
 
     # Prepare text for LLM input
     descriptions = "\n\n".join([
-        f"Name: {row['Name']}\nYear: {row['YearPublished']}\nDescription: {row['Description']}"
+        f"Name: {row['name']}\nYear: {row['year_published']}\nDescription: {row['description']}"
         for _, row in candidate_games.iterrows()
     ])
 
@@ -58,7 +67,7 @@ def get_llm_scores(user_description: str, min_players: int, category: str):
     The user described their ideal board game as follows:
     "{user_description}"
 
-    You are given a list of candidate board games. 
+    You are given a list of candidate board games.
     For each game, assign a relevance score between 0 and 1 that reflects how well it matches the user's description.
     Respond *only* in CSV format with two columns: Name, LLM_Score.
     Example:
@@ -80,64 +89,58 @@ def get_llm_scores(user_description: str, min_players: int, category: str):
     )
 
     csv_output = response.choices[0].message.content.strip()
-    csv_output = "\n".join(
-        line for line in csv_output.splitlines() if not line.strip().startswith("```")
-    ).strip()
+    csv_output = "\n".join(line for line in csv_output.splitlines() if not line.strip().startswith("```")).strip()
 
     # Convert CSV text to DataFrame with resilient parsing
     try:
         llm_scores_df = pd.read_csv(io.StringIO(csv_output))
     except Exception:
+        # Manual fallback: strip formatting and ensure 2 columns
         lines = [line for line in csv_output.splitlines() if "," in line]
         if not lines:
-            return pd.DataFrame(columns=["Name", "LLM_Score"])
-        rows = [line.split(",") for line in lines]
-        header, data_rows = rows[0], rows[1:]
-        if not data_rows:
-            # treat single line response as data without header
-            data_rows = [header]
-            header = ["Name", "LLM_Score"][: len(data_rows[0])]
+            return np.zeros(len(games_df))
+
+        # Clean commas within quoted names and trim whitespace
+        clean_lines = []
+        for line in lines:
+            parts = [p.strip() for p in line.split(",")]
+            if len(parts) > 2:
+                # Merge all but the last part as the game name
+                name = ",".join(parts[:-1]).strip('" ')
+                score = parts[-1].strip()
+                clean_lines.append([name, score])
+            elif len(parts) == 2:
+                clean_lines.append(parts)
+
+        # Use explicit header and create DataFrame
+        header = ["name", "llm_score"]
+        data_rows = [row for row in clean_lines if row[0].lower() != "name"]
         llm_scores_df = pd.DataFrame(data_rows, columns=header)
 
-    # Standardize column names and coerce expected schema
+    # Standardize column names
     llm_scores_df.columns = [col.strip().replace(" ", "_") for col in llm_scores_df.columns]
-    if "LLM_Score" not in llm_scores_df.columns and len(llm_scores_df.columns) >= 2:
-        llm_scores_df.rename(columns={llm_scores_df.columns[1]: "LLM_Score"}, inplace=True)
-    if "Name" not in llm_scores_df.columns and len(llm_scores_df.columns) >= 1:
-        llm_scores_df.rename(columns={llm_scores_df.columns[0]: "Name"}, inplace=True)
+    if "llm_score" not in llm_scores_df.columns and len(llm_scores_df.columns) >= 2:
+        llm_scores_df.rename(columns={llm_scores_df.columns[1]: "llm_score"}, inplace=True)
+    if "name" not in llm_scores_df.columns and len(llm_scores_df.columns) >= 1:
+        llm_scores_df.rename(columns={llm_scores_df.columns[0]: "name"}, inplace=True)
 
-    for col, default in {"Name": "", "LLM_Score": pd.NA}.items():
-        if col not in llm_scores_df.columns:
-            llm_scores_df[col] = default
-    llm_scores_df = llm_scores_df[["Name", "LLM_Score"]]
-    
-    # Coerce scores to numeric, salvaging simple textual annotations like "0.85 (high)"
-    if llm_scores_df["LLM_Score"].dtype == object:
-        llm_scores_df["LLM_Score"] = (
-            llm_scores_df["LLM_Score"]
-            .astype(str)
-            .str.extract(r"([0-9]*\.?[0-9]+)")[0]
-        )
-    llm_scores_df["LLM_Score"] = pd.to_numeric(llm_scores_df["LLM_Score"], errors="coerce")
-    llm_scores_df.dropna(subset=["LLM_Score"], inplace=True)
-    if llm_scores_df.empty:
-        raise ValueError(
-            "LLM response did not contain any usable scores. "
-            f"Raw response:\n{csv_output}"
-        )
-    llm_scores_df["LLM_Score"] = llm_scores_df["LLM_Score"].clip(0, 1)
+    # Clean numeric column
+    llm_scores_df["llm_score"] = (
+        llm_scores_df["llm_score"].astype(str).str.extract(r"([0-9]*\.?[0-9]+)")[0]
+    )
+    llm_scores_df["llm_score"] = pd.to_numeric(llm_scores_df["llm_score"], errors="coerce").clip(0, 1)
+    llm_scores_df.dropna(subset=["llm_score"], inplace=True)
 
-    candidate_lookup = candidate_games[["BGGId", "Name"]].drop_duplicates()
-    llm_scores_df = candidate_lookup.merge(llm_scores_df, on="Name", how="right")
-    llm_scores_df.dropna(subset=["BGGId"], inplace=True)
+    # Match to candidate games
+    candidate_lookup = candidate_games[["bgg_id", "name"]].drop_duplicates()
+    llm_scores_df = candidate_lookup.merge(llm_scores_df, on="name", how="right")
+    llm_scores_df.dropna(subset=["bgg_id"], inplace=True)
 
-    # Create a zero-filled array for all games
+    # Fill scores for all games
     full_scores = np.zeros(len(games_df))
-
-    # Map scores to the correct BGGId in games_df
-    score_map = dict(zip(llm_scores_df["BGGId"], llm_scores_df["LLM_Score"]))
+    score_map = dict(zip(llm_scores_df["bgg_id"], llm_scores_df["llm_score"]))
     for idx, row in games_df.iterrows():
-        bgg_id = row["BGGId"] if "BGGId" in games_df.columns else row["bgg_id"]
+        bgg_id = row["bgg_id"] if "bgg_id" in games_df.columns else row["bgg_id"]
         if bgg_id in score_map:
             full_scores[idx] = score_map[bgg_id]
 
@@ -147,7 +150,7 @@ if __name__ == "__main__":
     scores = get_llm_scores(
         user_description="I love cooperative adventure games with fantasy storytelling.",
         min_players=4,
-        category="Strategy"
+        category="Abstract / Strategy"
     )
     print("LLM Scores:", scores)
     print("LLM Scores Length:", len(scores))

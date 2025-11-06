@@ -85,10 +85,5 @@ if __name__ == "__main__":
 
     # Compute scores
     scores = get_cbf_scores(sample_input)
-
-    # Create a DataFrame combining game names and their CBF scores
-    df = games_df.copy()
-    df["cbf_score"] = scores
-    df_sorted = df.sort_values(by="cbf_score", ascending=False).head(10)
-
-    print(df_sorted[["name", "cbf_score"]] if "name" in df.columns else df_sorted.head(10))
+    print ("CBF Scores: ", scores)
+    print("CBF Scores Length: ", len(scores))
