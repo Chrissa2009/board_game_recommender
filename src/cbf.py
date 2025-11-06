@@ -5,13 +5,9 @@ from sklearn.metrics.pairwise import cosine_similarity
 import os
 
 # load precomputed CBF data
-<<<<<<< HEAD
 base_dir = os.path.dirname(os.path.abspath(__file__))
 cbf_path = os.path.join(base_dir, "..", "data", "precomputed_CBF.pkl")
 with open(cbf_path, "rb") as f:
-=======
-with open("../data/precomputed_CBF.pkl", "rb") as f:
->>>>>>> e1a434be5e5372f65ec5724fb208ac86e74e7bc5
     _cbf_data = pickle.load(f)
 
 games_df = _cbf_data["games_df"]
