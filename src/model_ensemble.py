@@ -178,44 +178,44 @@ def ensemble_scores(liked_games=None,
 
         # Numeric attributes
         if 'game_weight' in attributes:
-            w_min, w_max = attributes['game_weight']
-            mask = (games_df['game_weight'] >= w_min) & (games_df['game_weight'] <= w_max)
-            final_scores[~mask.values] = 0
+            weight_range = attributes['game_weight']
+            if isinstance(weight_range, (list, tuple)) and len(weight_range) == 2:
+                w_min, w_max = weight_range
+                mask = (games_df['game_weight'] >= w_min) & (games_df['game_weight'] <= w_max)
+                final_scores[~mask.values] = 0
 
         if 'players' in attributes:
-            p_min, p_max = attributes['players']
-            mask = (games_df['players_max'] >= p_min) & (games_df['players_min'] <= p_max)
-            final_scores[~mask.values] = 0
+            players_range = attributes['players']
+            if isinstance(players_range, (list, tuple)) and len(players_range) == 2:
+                p_min, p_max = players_range
+                mask = (games_df['players_max'] >= p_min) & (games_df['players_min'] <= p_max)
+                final_scores[~mask.values] = 0
 
         if 'play_time' in attributes:
-            t_min, t_max = attributes['play_time']
-            mask = (games_df['time_max'] >= t_min) & (games_df['time_min'] <= t_max)
-            final_scores[~mask.values] = 0
+            time_range = attributes['play_time']
+            if isinstance(time_range, (list, tuple)) and len(time_range) == 2:
+                t_min, t_max = time_range
+                mask = (games_df['time_max'] >= t_min) & (games_df['time_min'] <= t_max)
+                final_scores[~mask.values] = 0
 
         if 'year_published' in attributes:
-            y_min, y_max = attributes['year_published']
-            mask = (games_df['year_published'] >= y_min) & (games_df['year_published'] <= y_max)
-            final_scores[~mask.values] = 0
+            year_range = attributes['year_published']
+            if isinstance(year_range, (list, tuple)) and len(year_range) == 2:
+                y_min, y_max = year_range
+                mask = (games_df['year_published'] >= y_min) & (games_df['year_published'] <= y_max)
+                final_scores[~mask.values] = 0
 
         if 'min_rating' in attributes:
             min_rating = attributes['min_rating']
-            if isinstance(min_rating, (list, tuple)):
+            if isinstance(min_rating, (list, tuple)) and len(min_rating) > 0:
                 min_rating = min_rating[0]
-            mask = (games_df['avg_rating'] >= min_rating)
-            final_scores[~mask.values] = 0
-
-
-        if 'min_rating' in attributes:
-            min_rating = attributes['min_rating']
-            if isinstance(min_rating, (list, tuple)):
-                min_rating = min_rating[0]
-            mask = (games_df['avg_rating'] >= min_rating)
-            final_scores[~mask.values] = 0
-            
-    # Select top N recommendations ---
-    valid_idx = np.where(final_scores >= 0.01)[0]
-    if len(valid_idx) == 0:
-        return pd.DataFrame(), np.array([]), np.array([]), np.array([]), np.array([])
+                mask = (games_df['avg_rating'] >= min_rating)
+                final_scores[~mask.values] = 0
+                    
+            # Select top N recommendations ---
+            valid_idx = np.where(final_scores >= 0.01)[0]
+            if len(valid_idx) == 0:
+                return pd.DataFrame(), np.array([]), np.array([]), np.array([]), np.array([])
 
     top_n_idx = valid_idx[np.argsort(final_scores[valid_idx])[::-1][:n_recommendations]]
 
@@ -317,7 +317,7 @@ attributes = {'game_types': ['Abstract Game', 'Family Game'],
               'game_categories': ['Abstract / Strategy', 'Puzzle / Logic'],
               'game_weight': [1.5, 2.8],
               'players': [2,5],
-              'play_time': [30,90],
+              'play_time': [],
               'min_rating':[7.5],
               'year_published':[1999,2025]}
 
@@ -336,7 +336,7 @@ attributes = {'game_types': ['Strategy Game'],
               'game_categories': ['Science Fiction / Space'],
               'game_mechanics':['Dice Rolling', 'Set Collection'],
               'game_weight': [2.0, 3.9],
-              'players': [2,5],
+              'players': [],
               'play_time': [60,180],
               'min_rating':[7.5],
               'year_published':[1999,2025]}
@@ -366,7 +366,7 @@ display_recommendations(liked_games, disliked_games, exclude_games, attributes, 
 liked_games = [303954]
 disliked_games = []
 exclude_games = []
-description = ''
+description = 'historical games preferably with economics and trading'
 attributes = {'game_types': ['Strategy Game','Family Game'],
               'game_categories': ['Historical Eras','Educational'],
               'game_mechanics':['Simulation', 'Dice Rolling', 'Worker Placement','Set Collection','Drafting'],
