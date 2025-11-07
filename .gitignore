@@ -18,6 +18,3 @@ Thumbs.db
 
 # Environment files
 .env
-
-# Streamlit secrets
-src/.streamlit/secrets.toml
