@@ -8,9 +8,9 @@ import streamlit as st
 client = OpenAI(api_key=st.secrets.OPENAI_API_KEY)
 
 # Load game data
-games_df = pd.read_csv("../data/games_master_data.csv", encoding="utf-8-sig")
+games_df = pd.read_csv("./data/games_master_data.csv", encoding="utf-8-sig")
 
-desc_df = pd.read_csv("../data/game_descriptions.csv", encoding="utf-8-sig").rename(
+desc_df = pd.read_csv("./data/game_descriptions.csv", encoding="utf-8-sig").rename(
     columns={"bgg_id": "bgg_id", "full_description": "Description"}
 )
 

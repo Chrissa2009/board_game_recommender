@@ -29,7 +29,7 @@ def fold_in_implicit_user(V, liked_items, alpha=5, lambda_=0.03):
 def get_cf_scores(
     ratings: np.ndarray = np.array([]),
     V = None
-    #games_path: str = "../data/games.csv",
+    #games_path: str = "./data/games.csv",
 ):
     """
     Compute CF-based recommendation scores based on pre-computed item embedding matrix V and a vector of movie IDs of user likes
@@ -49,7 +49,7 @@ def get_cf_scores(
 
     #load board game embeddings if it wasn't passed in
     if V is None:
-        data = np.load('../data/V_final_quantized.npz')
+        data = np.load('./data/V_final_quantized.npz')
         V = data["V_q"].astype(np.float32) / 127 * data["scale"]
     
     # calculte user embeddings based on inputted likes 

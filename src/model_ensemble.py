@@ -8,7 +8,7 @@ from llm import get_llm_scores, category_columns
 warnings.filterwarnings('ignore')
 
 ### Load games into games_df
-games_file = "../data/games_master_data.csv"
+games_file = "./data/games_master_data.csv"
 
 def semicolon_to_list(value):
     if pd.isna(value) or value == "":

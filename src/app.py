@@ -190,27 +190,27 @@ st.markdown("---")
 # --- Load data ---
 @st.cache_data
 def load_data():
-    return pd.read_csv("../data/games.csv")
+    return pd.read_csv("./data/games.csv")
 
 @st.cache_data
 def load_mechanics():
-    mechanics_df = pd.read_csv("../data/game_mechanics.csv", header=None, names=["mechanic"])
+    mechanics_df = pd.read_csv("./data/game_mechanics.csv", header=None, names=["mechanic"])
     return mechanics_df["mechanic"].dropna().sort_values().tolist()
 
 @st.cache_data
 def load_categories():
-    categories_df = pd.read_csv("../data/game_categories.csv", header=None, names=["category"])
+    categories_df = pd.read_csv("./data/game_categories.csv", header=None, names=["category"])
     return categories_df["category"].dropna().sort_values().tolist()
 
 @st.cache_data
 def load_game_types():
-    game_types_df = pd.read_csv("../data/game_types.csv", header=None, names=["type"])
+    game_types_df = pd.read_csv("./data/game_types.csv", header=None, names=["type"])
     return game_types_df["type"].dropna().sort_values().tolist()
 
 @st.cache_data
 def load_master_assets():
     cols = ["bgg_id", "name", "thumbnail", "image", "ImagePath", "bgg_link"]
-    master_df = pd.read_csv("../data/games_master_data.csv", usecols=cols)
+    master_df = pd.read_csv("./data/games_master_data.csv", usecols=cols)
     master_df["bgg_id"] = pd.to_numeric(master_df["bgg_id"], errors="coerce").astype("Int64")
     master_df.dropna(subset=["bgg_id"], inplace=True)
     master_df["asset_url"] = (
