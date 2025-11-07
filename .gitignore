@@ -15,3 +15,5 @@ anaconda_projects/db/*.db
 # OS
 .DS_Store
 Thumbs.db
+
+src/.streamlit/secrets.toml

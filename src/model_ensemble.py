@@ -1,9 +1,6 @@
 import pandas as pd
 import numpy as np
 import warnings
-import sys, os
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
 from cbf import get_cbf_scores
 from cf import get_cf_scores
 from llm import get_llm_scores, category_columns
