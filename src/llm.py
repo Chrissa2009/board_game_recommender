@@ -1,13 +1,11 @@
 import io
-import os
 import numpy as np
 import pandas as pd
 from openai import OpenAI
-from dotenv import load_dotenv
 
-# Load .env file
-load_dotenv()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+import streamlit as st
+
+client = OpenAI(api_key=st.secrets.OPENAI_API_KEY)
 
 # Load game data
 games_df = pd.read_csv("../data/games_master_data.csv", encoding="utf-8-sig")
