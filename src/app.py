@@ -1,6 +1,9 @@
 # app.py
+import json
+from typing import Optional
 import streamlit as st
 import pandas as pd
+from openai import OpenAI
 from model_ensemble import ensemble_scores
 
 # ========= COLOR PALETTE =========
@@ -16,6 +19,7 @@ BUTTON_COLOR = "#A4B465"               # Muted green for buttons
 PLACEHOLDER_TEXT = "rgba(60, 60, 60, 0.6)"  # Placeholder gray
 
 st.set_page_config(page_title="Board Game Recommender", layout="wide")
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 # ========= CUSTOM CSS =========
 CUSTOM_STYLE = f"""
@@ -262,6 +266,51 @@ CARD_GRID_STYLE = """
 
 if "recommendations" not in st.session_state:
     st.session_state["recommendations"] = None
+if "recommendation_reason" not in st.session_state:
+    st.session_state["recommendation_reason"] = None
+if "search_context" not in st.session_state:
+    st.session_state["search_context"] = {}
+
+
+def generate_recommendation_reason(context: dict, recommendations: pd.DataFrame) -> Optional[str]:
+    if recommendations is None or recommendations.empty:
+        return None
+
+    top_games = recommendations.head(5)[
+        ["name", "game_categories", "game_mechanics", "recommender_score", "players_min", "players_max"]
+    ]
+
+    payload = {
+        "user_preferences": context,
+        "top_recommendations": top_games.to_dict(orient="records"),
+    }
+    prompt = (
+        "You are chatting inside a board game recommender app. "
+        "Using the structured data below, talk directly to the user in a friendly tone "
+        "and explain in 2-3 sentences why these games should click for them. "
+        "Call out specific mechanics, themes, or player counts that match their preferences, "
+        "and keep the explanation casual and encouraging.\n\n"
+        f"{json.dumps(payload, indent=2)}"
+    )
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a helpful, upbeat friend who explains recommendations directly to the user. "
+                        "Be conversational and positive, avoid sounding corporate."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.4,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception:
+        return None
 
 # ========== SIDEBAR ==========
 st.sidebar.header("Your Preferences")
@@ -273,7 +322,7 @@ disliked_games = st.sidebar.multiselect("Disliked Board Games", games_df["Name"]
 # --- Filter inputs ---
 year_range = st.sidebar.slider("Year Published", 1990, 2021, (2000, 2021))
 rating_min = st.sidebar.slider(
-    "Minimum Rating", 1.0, 10.0, 6.5, step=0.5
+    "Minimum Rating", 1.0, 10.0, 6.5, step=0.5, format="%.1f"
 )
 
 # --- CBF inputs ---
@@ -282,7 +331,7 @@ play_time = st.sidebar.selectbox(
     "Play Time",
     ["<30 mins", "30-60 mins", "60-90 mins", "90-120 mins", ">120 mins"],
 )
-complexity = st.sidebar.slider("Complexity", 1.0, 5.0, (2.3, 3.6), 0.1)
+complexity = st.sidebar.slider("Complexity", 1.0, 5.0, (2.3, 3.6), 0.1, format="%.1f")
 mechanics = st.sidebar.multiselect("Game Mechanics", mechanics_options)
 categories = st.sidebar.multiselect("Game Category", categories_options)
 game_type = st.sidebar.multiselect("Game Type", game_type_options)
@@ -331,6 +380,13 @@ if st.sidebar.button("Get Recommendations"):
         recommendations = pd.DataFrame()
 
     st.session_state["recommendations"] = recommendations
+    st.session_state["recommendation_reason"] = None
+    st.session_state["search_context"] = {
+        "liked_games": liked_games,
+        "disliked_games": disliked_games,
+        "description": description,
+        "attributes": attributes,
+    }
 
 recommendations_df = st.session_state.get("recommendations")
 st.markdown(CARD_GRID_STYLE, unsafe_allow_html=True)
@@ -366,6 +422,23 @@ elif isinstance(recommendations_df, pd.DataFrame):
         )
     cards.append("</div>")
     st.markdown("".join(cards), unsafe_allow_html=True)
+
+    st.subheader("Why we think you'll like these games", anchor=None)
+
+    explanation_text = st.session_state.get("recommendation_reason")
+    if explanation_text is None:
+        with st.spinner(""):
+            explanation = generate_recommendation_reason(
+                st.session_state.get("search_context", {}),
+                recommendations_df,
+            )
+            st.session_state["recommendation_reason"] = explanation
+            explanation_text = explanation
+
+    if explanation_text:
+        st.write(explanation_text)
+    else:
+        st.info("We couldn't generate a personalized explanation this time.")
 else:
     st.warning("Unable to display recommendations. Please try running the search again.")
 
