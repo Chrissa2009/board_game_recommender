@@ -1,7 +1,6 @@
 # app.py
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
 from model_ensemble import ensemble_scores
 
 # ========= COLOR PALETTE =========
@@ -13,7 +12,7 @@ FONT_SECONDARY = "#1C1C1C"           # Dark text for light backgrounds
 BORDER_COLOR = "rgba(0, 0, 0, 0.1)"  # Soft divider/border line
 SLIDER_NOTCH_COLOR = "#A4B465"          # Muted green for slider accents
 SLIDER_ACTIVE_COLOR = "#626F47"         # Darker green for active slider track
-BUTTON_COLOR = "#A4B465"               # Accent for primary calls-to-action
+BUTTON_COLOR = "#A4B465"               # Muted green for buttons
 PLACEHOLDER_TEXT = "rgba(60, 60, 60, 0.6)"  # Placeholder gray
 
 st.set_page_config(page_title="Board Game Recommender", layout="wide")
@@ -33,10 +32,10 @@ section.main p, section.main span, section.main label {{
 }}
 
 section.main > div.block-container {{
-  max-width: 1600px !important;
+  max-width: 1100px !important;
   margin: 0 auto !important;
-  padding-left: 2rem !important;
-  padding-right: 2rem !important;
+  padding-left: 3rem !important;
+  padding-right: 3rem !important;
 }}
 
 /* ==== SIDEBAR ==== */
@@ -149,6 +148,15 @@ section.main > div.block-container {{
 
 st.markdown(CUSTOM_STYLE, unsafe_allow_html=True)
 
+# ========= APP CONTENT WRAPPER =========
+st.markdown("""
+<div class="content-wrapper" style="
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 3rem;
+">
+""", unsafe_allow_html=True)
+
 # ========= HERO SECTION =========
 st.markdown(
     """
@@ -156,9 +164,8 @@ st.markdown(
         display: flex;
         justify-content: center;
         align-items: center;
-        margin: 2rem auto 3rem auto;
-        max-width: 1600px;
-        padding: 0 2rem;
+        margin: 0 auto 3rem auto;
+        width: 100%;
         gap: 2rem;
     ">
         <div style="flex: 1.5;">
@@ -194,15 +201,6 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
-
-# ========= APP CONTENT =========
-st.markdown("""
-<div class="content-wrapper" style="
-    max-width: 1600px;
-    margin: 0 auto;
-    padding: 2rem;
-">
-""", unsafe_allow_html=True)
 
 st.markdown("---")
 
@@ -280,7 +278,10 @@ rating_min, rating_max = st.sidebar.slider(
 
 # --- CBF inputs ---
 min_players, max_players = st.sidebar.slider("Player Count Range", 1, 20, (2, 4))
-play_time = st.sidebar.selectbox("Play Time", ["<30 mins", "30–60 mins", "60–90 mins", "90–120 mins", ">120 mins"])
+play_time = st.sidebar.selectbox(
+    "Play Time",
+    ["<30 mins", "30-60 mins", "60-90 mins", "90-120 mins", ">120 mins"],
+)
 complexity = st.sidebar.slider("Complexity", 1.0, 5.0, (2.3, 3.6), 0.1)
 mechanics = st.sidebar.multiselect("Game Mechanics", mechanics_options)
 categories = st.sidebar.multiselect("Game Category", categories_options)
@@ -306,9 +307,9 @@ if st.sidebar.button("Get Recommendations"):
     # Map play time text to numeric range
     play_time_map = {
         "<30 mins": [0, 30],
-        "30–60 mins": [30, 60],
-        "60–90 mins": [60, 90],
-        "90–120 mins": [90, 120],
+        "30-60 mins": [30, 60],
+        "60-90 mins": [60, 90],
+        "90-120 mins": [90, 120],
         ">120 mins": [120, 9999],
     }
     attributes["play_time"] = play_time_map.get(play_time, [0, 9999])
@@ -321,7 +322,7 @@ if st.sidebar.button("Get Recommendations"):
             exclude_games=[],
             attributes=attributes,
             description=description,
-            n_recommendations=8,
+            n_recommendations=24,
             alpha=0.5,
             beta=0.33,
         )
@@ -356,10 +357,10 @@ elif isinstance(recommendations_df, pd.DataFrame):
             f'  <img src="{image_url}" class="game-image" alt="{title}">'
             f'  <div class="game-content">'
             f'    <div class="game-title">{title}</div>'
-            f'    <div class="game-meta">⭐ {row.get("avg_rating", "N/A")}</div>'
+            f'    <div class="game-meta">&#9733; {row.get("avg_rating", "N/A")}</div>'
             f'    <div class="game-desc">{desc}</div>'
             f'    <a href="{row.get("bgg_link", "https://boardgamegeek.com/")}" '
-            f'       class="game-link" target="_blank">View on BGG →</a>'
+            f'       class="game-link" target="_blank">View on BGG &rarr;</a>'
             f'  </div>'
             f'</div>'
         )
@@ -368,3 +369,4 @@ elif isinstance(recommendations_df, pd.DataFrame):
 else:
     st.warning("Unable to display recommendations. Please try running the search again.")
 
+st.markdown("</div>", unsafe_allow_html=True)

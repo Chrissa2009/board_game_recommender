@@ -13,7 +13,6 @@ def fold_in_implicit_user(V, liked_items, alpha=5, lambda_=0.03):
     """
     liked_items = np.array(liked_items, dtype=int).flatten()
     V_i = V[liked_items]
-    print(liked_items)
     # confidence weights
     C_i = 1 + alpha * np.ones(len(liked_items), dtype=np.float32)
     
