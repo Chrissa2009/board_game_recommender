@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import warnings
 
-from cbf import get_CBF_scores
+from cbf import get_cbf_scores
 from cf import get_cf_scores
 from llm import get_llm_scores, category_columns
 
@@ -110,10 +110,10 @@ def ensemble_scores(liked_games=None,
     """
 
     ## Kai - how to call this?
-    #cf_scores = get_CF_scores(liked_games, disliked_games)
-    cf_scores = np.zeros(len(games_df))
+    cf_scores = get_cf_scores(ratings = liked_games)
+    #cf_scores = np.zeros(len(games_df))
     
-    cbf_scores = get_CBF_scores(attributes = attributes)
+    cbf_scores = get_cbf_scores(attributes = attributes)
 
     ## Chrissa - how to call this?
     #llm_scores = get_LLM_scores(???)
@@ -309,8 +309,8 @@ def display_recommendations(liked_games,
 ###
 
 # Example 1
-liked_games = [163412, 230802]
-disliked_games = [38929, 285533]
+liked_games = [235, 222]
+disliked_games = [6234, 1235]
 exclude_games = [184477]
 description = ''
 attributes = {'game_types': ['Abstract Game', 'Family Game'],
@@ -328,7 +328,7 @@ display_recommendations(liked_games, disliked_games, exclude_games, attributes, 
 
 
 # Example 2
-liked_games = [167791]
+liked_games = [1111]
 disliked_games = []
 description = ''
 exclude_games = [175155, 221194]
@@ -347,7 +347,7 @@ display_recommendations(liked_games, disliked_games, exclude_games, attributes, 
 
 
 # Example 3
-liked_games = [31260, 13]
+liked_games = [222, 13]
 disliked_games = []
 description = ''
 exclude_games = [58421]
@@ -363,7 +363,7 @@ attributes = {'game_types': ['Strategy Game','Family Game'],
 display_recommendations(liked_games, disliked_games, exclude_games, attributes, description, n_recommendations=5, alpha=0.5, beta=0.33)
 
 # Example 4
-liked_games = [303954]
+liked_games = [33]
 disliked_games = []
 exclude_games = []
 description = 'historical games preferably with economics and trading'
