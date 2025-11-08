@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import warnings
 
-from cbf import get_CBF_scores
+from cbf import get_cbf_scores
 from cf import get_cf_scores
 from llm import get_llm_scores, category_columns
 
@@ -113,7 +113,7 @@ def ensemble_scores(liked_games=None,
     #cf_scores = get_CF_scores(liked_games, disliked_games)
     cf_scores = np.zeros(len(games_df))
     
-    cbf_scores = get_CBF_scores(attributes = attributes)
+    cbf_scores = get_cbf_scores(attributes = attributes)
 
     ## Chrissa - how to call this?
     #llm_scores = get_LLM_scores(???)
