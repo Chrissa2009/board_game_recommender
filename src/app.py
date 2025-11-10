@@ -12,6 +12,7 @@ BACKGROUND_SECONDARY = "#F5F5E6"     # Light gray for sidebar/user input area
 BACKGROUND_INPUT = "#FFFFFF"         # White input box background
 FONT_PRIMARY = "#F5F5E6"             # Off-white text on dark background
 FONT_SECONDARY = "#1C1C1C"           # Dark text for light backgrounds
+FONT_TERTIARY = "#A4B465"            # Accent text color
 BORDER_COLOR = "rgba(0, 0, 0, 0.1)"  # Soft divider/border line
 SLIDER_NOTCH_COLOR = "#A4B465"          # Muted green for slider accents
 SLIDER_ACTIVE_COLOR = "#626F47"         # Darker green for active slider track
@@ -80,12 +81,24 @@ section.main > div.block-container {{
   min-height: 100px !important;
 }}
 
+/* Default tag styling */
 [data-testid="stSidebar"] .stMultiSelect div[data-baseweb="tag"] {{
   background-color: {BACKGROUND_INPUT} !important;
   color: {FONT_SECONDARY} !important;
   border: none !important;
   box-shadow: none !important;
 }}
+
+/* Highlight tags for the 'Liked Board Games' widget */
+[data-testid="stSidebar"] div[aria-label="Liked Board Games"] div[data-baseweb="tag"] {{
+  background-color: #2e8b57 !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+}}
+[data-testid="stSidebar"] div[aria-label="Liked Board Games"] div[data-baseweb="tag"] p {{
+  color: #ffffff !important;
+}}
+
 
 [data-testid="stSidebar"] input::placeholder,
 [data-testid="stSidebar"] textarea::placeholder {{
@@ -106,6 +119,30 @@ section.main > div.block-container {{
 [data-testid="stSidebar"] .stSlider div[data-testid="stTickBarMin"],
 [data-testid="stSidebar"] .stSlider div[data-testid="stTickBarMax"] {{
   color: {FONT_SECONDARY} !important;
+}}
+
+[data-testid="stSidebar"] .range-display {{
+  font-size: 0.9rem;
+  color: {FONT_SECONDARY};
+  margin-top: 0.25rem;
+  margin-bottom: 0.9rem;
+  font-weight: 600;
+}}
+
+[data-testid="stSidebar"] .range-display span {{
+  color: {SLIDER_ACTIVE_COLOR};
+}}
+
+[data-testid="stSidebar"] .range-display {{
+  font-size: 0.9rem;
+  color: {FONT_SECONDARY};
+  margin-top: 0.25rem;
+  margin-bottom: 0.9rem;
+  font-weight: 600;
+}}
+
+[data-testid="stSidebar"] .range-display span {{
+  color: {SLIDER_ACTIVE_COLOR};
 }}
 
 /* Sidebar primary button */
@@ -259,8 +296,8 @@ CARD_GRID_STYLE = """
 .game-title{font-size:1.15rem;font-weight:700;margin-bottom:.4rem}
 .game-meta{font-size:.9rem;color:#B8B8B8;display:flex;gap:1rem;align-items:center;margin-bottom:.6rem}
 .game-desc{font-size:.95rem;color:#CCC;margin-bottom:.8rem}
-.game-link{color:#A4B465;font-weight:600;text-decoration:none}
-.game-link:hover{text-decoration:underline}
+.game-link{color:{FONT_TERTIARY};font-weight:600;text-decoration:none}
+.game-link:hover{text-decoration:none}
 </style>
 """
 
@@ -327,7 +364,21 @@ disliked_games = st.sidebar.multiselect(
 )
 
 # --- Filter inputs ---
-year_range = st.sidebar.slider("Year Published", 1990, 2021, (2000, 2021))
+default_year_range = (2000, 2021)
+if "year_range" not in st.session_state:
+    st.session_state["year_range"] = default_year_range
+
+year_range_label = (
+    f"Year Published ({st.session_state['year_range'][0]} - {st.session_state['year_range'][1]})"
+)
+st.sidebar.slider(
+    year_range_label,
+    1990,
+    2021,
+    value=st.session_state["year_range"],
+    key="year_range"
+)
+year_range = st.session_state["year_range"]
 rating_min = st.sidebar.slider(
     "Minimum Rating", 1.0, 10.0, 6.5, step=0.5, format="%.1f"
 )
@@ -347,7 +398,6 @@ game_type = st.sidebar.multiselect("Game Type", game_type_options)
 description = st.sidebar.text_area("Describe the kind of board game you enjoy",
                                    placeholder="Example: I like strategic games with some luck and engine building mechanics.")
 
-# ========= RUN RECOMMENDER ==========
 # ========= RUN RECOMMENDER ==========
 st.sidebar.markdown("### Get Recommendations (Choose a Model)")
 
@@ -443,15 +493,25 @@ elif isinstance(recommendations_df, pd.DataFrame):
         title = str(row["name"])
         score = row.get("recommender_score", 0)
         desc = f"Hybrid Score: {score:.3f}"
+        bgg_link = row.get("bgg_link")
+        if pd.isna(bgg_link) or not str(bgg_link).strip():
+            bgg_id = row.get("bgg_id")
+            if pd.notna(bgg_id):
+                bgg_link = f"https://boardgamegeek.com/boardgame/{int(bgg_id)}"
+            else:
+                bgg_link = "https://boardgamegeek.com/"
+
+        avg_rating = row.get("avg_rating")
+        rating_display = f"{avg_rating:.1f}" if pd.notna(avg_rating) else "N/A"
 
         cards.append(
             f'<div class="game-card">'
             f'  <img src="{image_url}" class="game-image" alt="{title}">'
             f'  <div class="game-content">'
             f'    <div class="game-title">{title}</div>'
-            f'    <div class="game-meta">&#9733; {row.get("avg_rating", "N/A")}</div>'
+            f'    <div class="game-meta">&#9733; {rating_display}</div>'
             f'    <div class="game-desc">{desc}</div>'
-            f'    <a href="{row.get("bgg_link", "https://boardgamegeek.com/")}" '
+            f'    <a href="{bgg_link}" '
             f'       class="game-link" target="_blank">View on BGG &rarr;</a>'
             f'  </div>'
             f'</div>'
