@@ -336,7 +336,7 @@ rating_min = st.sidebar.slider(
 min_players, max_players = st.sidebar.slider("Player Count Range", 1, 20, (2, 4))
 play_time = st.sidebar.selectbox(
     "Play Time",
-    ["<30 mins", "30-60 mins", "60-90 mins", "90-120 mins", ">120 mins"],
+    ["Any", "<30 mins", "30-60 mins", "60-90 mins", "90-120 mins", ">120 mins"],
 )
 complexity = st.sidebar.slider("Complexity", 1.0, 5.0, (2.3, 3.6), 0.1, format="%.1f")
 mechanics = st.sidebar.multiselect("Game Mechanics", mechanics_options)
@@ -390,6 +390,7 @@ if selected_model:
 
     # Map play time text to numeric range
     play_time_map = {
+        "Any" : [],
         "<30 mins": [0, 30],
         "30-60 mins": [30, 60],
         "60-90 mins": [60, 90],
