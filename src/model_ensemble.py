@@ -66,6 +66,8 @@ games_df.rename(columns={'simple_game_categories': 'game_categories', 'simple_ga
 games_df = games_df.set_index("bgg_id", drop=False)
 n_games = games_df.shape[0]
 
+# Toggle to include/exclude attribute-based filtering when inspecting hybrid scores.
+APPLY_ATTRIBUTE_FILTERS = True
 
 ### get enseble score
 def ensemble_scores(liked_games=None,
@@ -181,7 +183,7 @@ def ensemble_scores(liked_games=None,
             final_scores[idx] = 0
     
     # --- Apply attribute filters ---
-    if attributes:
+    if APPLY_ATTRIBUTE_FILTERS and attributes:
         # Multi-label attributes
         for attr_name in ['game_categories', 'game_mechanics', 'game_types']:
             selected = attributes.get(attr_name, [])
@@ -228,11 +230,11 @@ def ensemble_scores(liked_games=None,
                 min_rating = min_rating[0]
                 mask = (games_df['avg_rating'] >= min_rating)
                 final_scores[~mask.values] = 0
-                    
-            # Select top N recommendations ---
-            valid_idx = np.where(final_scores >= 0.01)[0]
-            if len(valid_idx) == 0:
-                return pd.DataFrame(), np.array([]), np.array([]), np.array([]), np.array([])
+
+    # Select top N recommendations ---
+    valid_idx = np.where(final_scores >= 0.01)[0]
+    if len(valid_idx) == 0:
+        return pd.DataFrame(), np.array([]), np.array([]), np.array([]), np.array([])
 
     top_n_idx = valid_idx[np.argsort(final_scores[valid_idx])[::-1][:n_recommendations]]
 
@@ -258,14 +260,14 @@ def display_recommendations(liked_games,
                             description,
                             n_recommendations=5,
                             alpha=0.5,
-                            beta=0.33):
+                            beta=0.33,
+                            recommendations=None):
     
-    recommendations = ensemble_scores(liked_games, disliked_games, exclude_games,
-                                               attributes=attributes, description=description,
-                                               n_recommendations=n_recommendations,
-                                               alpha=alpha, beta=beta)
-
-    #print(recommendations)
+    if recommendations is None:
+        recommendations = ensemble_scores(liked_games, disliked_games, exclude_games,
+                                          attributes=attributes, description=description,
+                                          n_recommendations=n_recommendations,
+                                          alpha=alpha, beta=beta)
     
     # --- Helper: get names from IDs ---
     def get_game_names(id_list):
@@ -304,6 +306,10 @@ def display_recommendations(liked_games,
         game = games_df.loc[bgg_id]
 
         print(f"*** {bgg_id} {game['name']:<35} Recommender score: {score:.4f}")
+        cf_component = row.get("cf_score_component", 0.0)
+        cbf_component = row.get("cbf_score_component", 0.0)
+        llm_component = row.get("llm_score_component", 0.0)
+        print(f"    CF: {cf_component:.4f} | CBF: {cbf_component:.4f} | LLM: {llm_component:.4f}")
         print(f"    User Rating: {game.get('avg_rating', 'N/A'):.2f}")
         print(f"    Categories: {', '.join(game.get('game_categories', []))}")
         print(f"    Game Types: {', '.join(game.get('game_types', []))}")
@@ -312,67 +318,32 @@ def display_recommendations(liked_games,
               f"| Players: {int(game.get('players_min', 0))}–{int(game.get('players_max', 0))}\n")
 
 ### Run Recommender
-###
 
-# Example 1
-liked_games = [235, 222]
-disliked_games = [6234, 1235]
-exclude_games = [184477]
-description = ''
-attributes = {'game_types': ['Abstract Game', 'Family Game'],
-              'game_categories': ['Abstract / Strategy', 'Puzzle / Logic'],
-              'game_weight': [1.5, 2.8],
-              'players': [2,5],
-              'play_time': [],
-              'min_rating':[7.5],
-              'year_published':[1999,2025]}
+if __name__ == "__main__":
+    liked_games = [235, 222]
+    disliked_games = [6234, 1235]
+    exclude_games = [184477]
+    description = ''
+    attributes = {'game_types': ['Abstract Game', 'Family Game'],
+                'game_categories': ['Abstract / Strategy', 'Puzzle / Logic'],
+                'game_weight': [1.5, 2.8],
+                'players': [2,5],
+                'play_time': [],
+                'min_rating':[7.5],
+                'year_published':[1999,2025]}
 
-display_recommendations(liked_games, disliked_games, exclude_games, attributes, description, n_recommendations=5, alpha=0.5, beta=0.33)
+    recommendations = ensemble_scores(
+        liked_games,
+        disliked_games,
+        exclude_games,
+        attributes=attributes,
+        description=description,
+        n_recommendations=5,
+        alpha=0.5,
+        beta=0.33
+    )
 
-# Example 2
-liked_games = [1111]
-disliked_games = []
-description = ''
-exclude_games = [175155, 221194]
-attributes = {'game_types': ['Strategy Game'],
-              'game_categories': ['Science Fiction / Space'],
-              'game_mechanics':['Dice Rolling', 'Set Collection'],
-              'game_weight': [2.0, 3.9],
-              'players': [],
-              'play_time': [60,180],
-              'min_rating':[7.5],
-              'year_published':[1999,2025]}
+    display_recommendations(liked_games, disliked_games, exclude_games, attributes,
+                            description, n_recommendations=5, alpha=0.5, beta=0.33,
+                            recommendations=recommendations)
 
-display_recommendations(liked_games, disliked_games, exclude_games, attributes, description, n_recommendations=5, alpha=0.5, beta=0.33)
-
-# Example 3
-liked_games = [222, 13]
-disliked_games = []
-description = ''
-exclude_games = [58421]
-attributes = {'game_types': ['Strategy Game','Family Game'],
-              'game_categories': ['Animals / Nature'],
-              'game_mechanics':['Dice Rolling', 'Set Collection','Drafting'],
-              'game_weight': [2.0, 3.9],
-              'players': [2,5],
-              'play_time': [60,180],
-              'min_rating':[7.5],
-              'year_published':[1999,2025]}
-
-display_recommendations(liked_games, disliked_games, exclude_games, attributes, description, n_recommendations=5, alpha=0.5, beta=0.33)
-
-# Example 4
-liked_games = [33]
-disliked_games = []
-exclude_games = []
-description = 'historical games preferably with economics and trading'
-attributes = {'game_types': ['Strategy Game','Family Game'],
-              'game_categories': ['Historical Eras','Educational'],
-              'game_mechanics':['Simulation', 'Dice Rolling', 'Worker Placement','Set Collection','Drafting'],
-              'game_weight': [3.0, 4.0],
-              'players': [3,7],
-              'play_time': [60,300],
-              'min_rating':[7.5],
-              'year_published':[2000,2025]}
-
-display_recommendations(liked_games, disliked_games, exclude_games, attributes, description, n_recommendations=5, alpha=0.5, beta=0.33)
