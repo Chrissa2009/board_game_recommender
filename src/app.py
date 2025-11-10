@@ -316,8 +316,15 @@ def generate_recommendation_reason(context: dict, recommendations: pd.DataFrame)
 st.sidebar.header("Your Preferences")
 
 # --- CF inputs ---
-liked_games = st.sidebar.multiselect("Liked Board Games", games_df["Name"].unique())
-disliked_games = st.sidebar.multiselect("Disliked Board Games", games_df["Name"].unique())
+liked_games = st.sidebar.multiselect(
+    "Liked Board Games",
+    options=sorted(games_df["Name"].dropna().tolist())
+)
+
+disliked_games = st.sidebar.multiselect(
+    "Exclude from Recommendation",
+    options=sorted(games_df["Name"].dropna().tolist())
+)
 
 # --- Filter inputs ---
 year_range = st.sidebar.slider("Year Published", 1990, 2021, (2000, 2021))
@@ -341,7 +348,35 @@ description = st.sidebar.text_area("Describe the kind of board game you enjoy",
                                    placeholder="Example: I like strategic games with some luck and engine building mechanics.")
 
 # ========= RUN RECOMMENDER ==========
-if st.sidebar.button("Get Recommendations"):
+# ========= RUN RECOMMENDER ==========
+st.sidebar.markdown("### Get Recommendations (Choose a Model)")
+
+# Define model parameter sets
+model_configs = {
+    "A": {"alpha": 0.50, "beta": 0.33},
+    "B": {"alpha": 0.67, "beta": 0.25},
+    "C": {"alpha": 0.33, "beta": 0.25},
+    "D": {"alpha": 0.50, "beta": 0.50},
+}
+
+# Display four buttons side-by-side
+col1, col2 = st.sidebar.columns(2)
+col3, col4 = st.sidebar.columns(2)
+
+buttons = {
+    "A": col1.button("Get Recommendations A"),
+    "B": col2.button("Get Recommendations B"),
+    "C": col3.button("Get Recommendations C"),
+    "D": col4.button("Get Recommendations D"),
+}
+
+# Determine which button was pressed
+selected_model = next((key for key, pressed in buttons.items() if pressed), None)
+
+if selected_model:
+    alpha = model_configs[selected_model]["alpha"]
+    beta = model_configs[selected_model]["beta"]
+
     # Build attribute dictionary from sidebar selections
     attributes = {
         "game_categories": categories,
@@ -363,8 +398,7 @@ if st.sidebar.button("Get Recommendations"):
     }
     attributes["play_time"] = play_time_map.get(play_time, [0, 9999])
 
-    # Call the hybrid ensemble recommender
-    with st.spinner("Generating recommendations..."):
+    with st.spinner(f"Generating recommendations (Model {selected_model}: α={alpha}, β={beta})..."):
         recommendations = ensemble_scores(
             liked_games=[] if not liked_games else games_df.loc[games_df["Name"].isin(liked_games), "BGGId"].tolist(),
             disliked_games=[] if not disliked_games else games_df.loc[games_df["Name"].isin(disliked_games), "BGGId"].tolist(),
@@ -372,8 +406,8 @@ if st.sidebar.button("Get Recommendations"):
             attributes=attributes,
             description=description,
             n_recommendations=20,
-            alpha=0.5,
-            beta=0.33,
+            alpha=alpha,
+            beta=beta,
         )
 
     if not isinstance(recommendations, pd.DataFrame):
@@ -386,7 +420,9 @@ if st.sidebar.button("Get Recommendations"):
         "disliked_games": disliked_games,
         "description": description,
         "attributes": attributes,
+        "model_used": selected_model,
     }
+
 
 recommendations_df = st.session_state.get("recommendations")
 st.markdown(CARD_GRID_STYLE, unsafe_allow_html=True)
