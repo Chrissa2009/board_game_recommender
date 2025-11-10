@@ -316,8 +316,12 @@ def generate_recommendation_reason(context: dict, recommendations: pd.DataFrame)
 st.sidebar.header("Your Preferences")
 
 # --- CF inputs ---
-liked_games = st.sidebar.multiselect("Liked Board Games", games_df["Name"].unique())
-disliked_games = st.sidebar.multiselect("Disliked Board Games", games_df["Name"].unique())
+game_names = sorted(
+    games_df["Name"].dropna().unique(),
+    key=lambda name: name.lower(),
+)
+liked_games = st.sidebar.multiselect("Liked Board Games", game_names)
+disliked_games = st.sidebar.multiselect("Disliked Board Games", game_names)
 
 # --- Filter inputs ---
 year_range = st.sidebar.slider("Year Published", 1990, 2021, (2000, 2021))
