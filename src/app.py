@@ -537,7 +537,7 @@ play_time = st.sidebar.selectbox(
 )
 complexity = st.sidebar.slider("Weight", 1.0, 5.0, (2.3, 3.6), 0.1, format="%.1f")
 mechanics = st.sidebar.multiselect("Game Mechanics", mechanics_options)
-categories = st.sidebar.multiselect("Game Category/Theme", categories_options)
+categories = st.sidebar.multiselect("Game Category / Theme", categories_options)
 game_type = st.sidebar.multiselect("Game Type", game_type_options)
 
 # --- LLM input ---
@@ -651,7 +651,7 @@ elif isinstance(recommendations_df, pd.DataFrame):
         avg_rating = row.get("avg_rating")
         rating_display = f"{avg_rating:.1f}" if pd.notna(avg_rating) else "N/A"
         game_weight = row.get("game_weight")
-        weight_display = str(f"{game_weight:.2f}") + "/5" if pd.notna(game_weight) else "N/A"
+        weight_display = str(f"{game_weight:.2f}") + " / 5" if pd.notna(game_weight) else "N/A"
 
         def _valid(val):
             return pd.notna(val) and val > 0
