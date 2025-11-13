@@ -23,7 +23,7 @@ PLACEHOLDER_TEXT = "rgba(60, 60, 60, 0.6)"  # Placeholder gray
 
 st.set_page_config(page_title="Board Game Recommender", layout="wide")
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-n_games = 8 
+n_games = 5 
 
 # ========= CUSTOM CSS =========
 CUSTOM_STYLE = f"""
@@ -535,7 +535,7 @@ play_time = st.sidebar.selectbox(
     "Play Time",
     ["Any", "<30 mins", "30-60 mins", "60-90 mins", "90-120 mins", ">120 mins"],
 )
-complexity = st.sidebar.slider("Weight", 1.0, 5.0, (2.3, 3.6), 0.1, format="%.1f")
+complexity = st.sidebar.slider("Game Complexity", 1.0, 5.0, (2.3, 3.6), 0.1, format="%.1f")
 mechanics = st.sidebar.multiselect("Game Mechanics", mechanics_options)
 categories = st.sidebar.multiselect("Game Category / Theme", categories_options)
 game_type = st.sidebar.multiselect("Game Type", game_type_options)
