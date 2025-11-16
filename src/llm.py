@@ -1,14 +1,49 @@
 import io
+from typing import Any, Dict, Optional
+
 import numpy as np
 import pandas as pd
 from openai import OpenAI
-
 import streamlit as st
 
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
+
+def semicolon_to_list(value: Any) -> list:
+    """Normalize semicolon-delimited strings (or lists) into clean lists."""
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return []
+    if isinstance(value, list):
+        return [item.strip() for item in value if isinstance(item, str) and item.strip()]
+    if isinstance(value, str):
+        return [item.strip() for item in value.split(";") if item.strip()]
+    return []
+
 # Load game data
 games_df = pd.read_csv("./data/games_master_data.csv", encoding="utf-8-sig")
+
+for col in [
+    "game_categories",
+    "simple_game_categories",
+    "game_mechanics",
+    "simple_game_mechanics",
+    "game_types",
+]:
+    if col in games_df.columns:
+        games_df[col] = games_df[col].apply(semicolon_to_list)
+
+if "game_categories" in games_df.columns and "simple_game_categories" in games_df.columns:
+    games_df.drop(columns=["game_categories"], inplace=True)
+if "game_mechanics" in games_df.columns and "simple_game_mechanics" in games_df.columns:
+    games_df.drop(columns=["game_mechanics"], inplace=True)
+
+games_df.rename(
+    columns={
+        "simple_game_categories": "game_categories",
+        "simple_game_mechanics": "game_mechanics",
+    },
+    inplace=True,
+)
 
 desc_df = pd.read_csv("./data/game_descriptions.csv", encoding="utf-8-sig").rename(
     columns={"bgg_id": "bgg_id", "full_description": "Description"}
@@ -23,41 +58,130 @@ merged_df = pd.merge(
 )
 
 # Extract all category columns automatically
-games_df["simple_game_categories"] = games_df["simple_game_categories"].fillna("").astype(str)
-all_categories = (
-    games_df["simple_game_categories"]
-    .str.split(";")
-    .explode()
-    .str.strip()
-    .dropna()
-    .unique()
+category_source = games_df["game_categories"] if "game_categories" in games_df.columns else []
+all_categories = sorted(
+    {
+        cat.strip()
+        for cats in category_source
+        for cat in (cats if isinstance(cats, list) else [])
+        if isinstance(cat, str) and cat.strip()
+    }
 )
-category_columns = sorted(all_categories.tolist())
+category_columns = all_categories
 
-def get_llm_scores(user_description: str, min_players: int, category: str):
+
+def apply_attribute_filters(df: pd.DataFrame, attributes: Optional[Dict[str, Any]]) -> pd.DataFrame:
+    """Apply the same attribute masks used by the ensemble to the LLM candidate pool."""
+    if not attributes:
+        return df
+
+    mask = pd.Series(True, index=df.index)
+
+    def multi_label_mask(column: str):
+        selected = attributes.get(column, [])
+        if column not in df.columns or not selected:
+            return None
+        selected_clean = {
+            s.strip().lower() for s in selected if isinstance(s, str) and s.strip()
+        }
+        if not selected_clean:
+            return None
+
+        def matches(values):
+            if isinstance(values, (list, tuple)):
+                return any(
+                    isinstance(v, str) and v.strip().lower() in selected_clean
+                    for v in values
+                )
+            if isinstance(values, str):
+                return values.strip().lower() in selected_clean
+            return False
+
+        return df[column].apply(matches).fillna(False)
+
+    for attr_column in ["game_categories", "game_mechanics", "game_types"]:
+        column_mask = multi_label_mask(attr_column)
+        if column_mask is not None:
+            mask &= column_mask
+
+    def range_mask(column: str, value_range):
+        if column not in df.columns:
+            return None
+        if (
+            isinstance(value_range, (list, tuple))
+            and len(value_range) == 2
+            and any(value_range)
+        ):
+            min_val, max_val = value_range
+            series = df[column]
+            return series.between(min_val, max_val, inclusive="both").fillna(False)
+        return None
+
+    weight_mask = range_mask("game_weight", attributes.get("game_weight"))
+    if weight_mask is not None:
+        mask &= weight_mask
+
+    year_mask = range_mask("year_published", attributes.get("year_published"))
+    if year_mask is not None:
+        mask &= year_mask
+
+    rating_values = attributes.get("min_rating")
+    if (
+        "avg_rating" in df.columns
+        and isinstance(rating_values, (list, tuple))
+        and rating_values
+    ):
+        min_rating = rating_values[0]
+        rating_mask = (df["avg_rating"] >= min_rating).fillna(False)
+        mask &= rating_mask
+
+    players_range = attributes.get("players")
+    if (
+        isinstance(players_range, (list, tuple))
+        and len(players_range) == 2
+        and "players_min" in df.columns
+        and "players_max" in df.columns
+    ):
+        p_min, p_max = players_range
+        players_mask = (df["players_max"] >= p_min) & (df["players_min"] <= p_max)
+        mask &= players_mask.fillna(False)
+
+    play_time_range = attributes.get("play_time")
+    if (
+        isinstance(play_time_range, (list, tuple))
+        and len(play_time_range) == 2
+        and play_time_range
+        and "time_min" in df.columns
+        and "time_max" in df.columns
+    ):
+        t_min, t_max = play_time_range
+        time_mask = (df["time_max"] >= t_min) & (df["time_min"] <= t_max)
+        mask &= time_mask.fillna(False)
+
+    return df[mask]
+
+def get_llm_scores(
+    user_description: str,
+    attributes: Optional[Dict[str, Any]] = None,
+    top_k: int = 300,
+):
     """
     Generate LLM-based relevance scores for candidate games based on the user description.
-    Returns a 1D NumPy array of scores aligned with games_df order.
+    The candidate pool is filtered with the same attribute masks used downstream so that
+    the LLM signal survives the final ensemble filtering.
     """
-    if category not in category_columns:
-        raise ValueError(f"Invalid category '{category}'. Available categories: {category_columns}")
-
-    # Filter dataset by player count and simple category
-    filtered_df = merged_df[
-        (merged_df["players_min"] <= min_players)
-        & (merged_df["players_max"] >= min_players)
-        & (merged_df["simple_game_categories"].str.contains(fr"\b{category}\b", case=False, na=False))
-    ]
+    attributes = attributes or {}
+    filtered_df = apply_attribute_filters(merged_df, attributes)
 
     if filtered_df.empty:
         return np.zeros(len(games_df))
 
-    # Limit to top 20 by rating for token efficiency
-    candidate_games = filtered_df.sort_values("avg_rating", ascending=False).head(20)
+    # Limit to top games by rating for token efficiency
+    candidate_games = filtered_df.sort_values("avg_rating", ascending=False).head(top_k)
 
     # Prepare text for LLM input
     descriptions = "\n\n".join([
-        f"Name: {row['name']}\nYear: {row['year_published']}\nDescription: {row['description']}"
+        f"Name: {row['name']}\nYear: {row['year_published']}\nDescription: {row.get('description', '')}"
         for _, row in candidate_games.iterrows()
     ])
 
@@ -147,8 +271,10 @@ def get_llm_scores(user_description: str, min_players: int, category: str):
 if __name__ == "__main__":
     scores = get_llm_scores(
         user_description="I love cooperative adventure games with fantasy storytelling.",
-        min_players=4,
-        category="Abstract / Strategy"
+        attributes={
+            "players": [4, 4],
+            "game_categories": ["Abstract / Strategy"],
+        },
     )
     print("LLM Scores:", scores)
     print("LLM Scores Length:", len(scores))

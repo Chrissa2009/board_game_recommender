@@ -4,10 +4,9 @@ import warnings
 
 from cbf import get_cbf_scores
 from cf import get_cf_scores
-from llm import get_llm_scores, category_columns
+from llm import get_llm_scores
 
 warnings.filterwarnings('ignore')
-
 
 ### Load games into games_df
 games_file = "./data/games_master_data.csv"
@@ -19,7 +18,6 @@ def semicolon_to_list(value):
     if isinstance(value, list):  # prevent double conversion
         return value
     return [item.strip() for item in str(value).split(';') if item.strip()]
-
 
 games_df = pd.read_csv(
     games_file,
@@ -105,7 +103,6 @@ def ensemble_scores(liked_games=None,
     'year_published', 'players_min', 'players_max'
     'recommender_score', 'cf_score_component', 'cbf_score_component', 'llm_score_component'
     
-    
     -------
     pd.DataFrame
         Combined recommendations with composite score.
@@ -117,25 +114,11 @@ def ensemble_scores(liked_games=None,
     
     # get cbf_scores
     cbf_scores = get_cbf_scores(attributes=attributes)
-    
 
     # get llm_scores
-    min_players = 1
-    if attributes and 'players' in attributes:
-        players = attributes['players']
-        if isinstance(players, (list, tuple)) and len(players) > 0:
-            min_players = players[0]
-
-    category = category_columns[0]
-    if attributes and 'game_categories' in attributes:
-        cats = attributes['game_categories']
-        if isinstance(cats, (list, tuple)) and len(cats) > 0 and cats[0]:
-            category = cats[0]
-
     llm_scores = get_llm_scores(
         user_description=description or "",
-        min_players=min_players,
-        category=category,
+        attributes=attributes,
     )
     
     # convert and validate input
@@ -174,7 +157,6 @@ def ensemble_scores(liked_games=None,
     disliked_games = disliked_games or []
     exclude_games = exclude_games or []
     attributes = attributes or {}
-
 
     # --- Apply exclusion filters ---
     for gid in liked_games + disliked_games + exclude_games:
@@ -347,4 +329,3 @@ if __name__ == "__main__":
     display_recommendations(liked_games, disliked_games, exclude_games, attributes,
                             description, n_recommendations=5, alpha=0.5, beta=0.33,
                             recommendations=recommendations)
-
